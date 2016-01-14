@@ -40,13 +40,12 @@ int main(int argc, char *argv[])
 		n = atoi(argv[1]);
 		k = atoi(argv[2]);
 
-        srand(seed);
 
 		/* Vector para almacenar usuarios, n bits */
 		//vector<bool> users(n);
 		mpz_init2(users, n);
 
-		srand(time(NULL));
+        srand(seed);
 		
 		time2(start);
 		/* Inicialmente creamos k grupos */
