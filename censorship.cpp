@@ -98,10 +98,7 @@ int main(int argc, char *argv[])
 			if (limite.first == limite.second)
 			{
 				if (mpz_tstbit(users, limite.first))
-				{
 					identificados++;
-					claves -= 1;
-				}
 			}
 			else
 			{
