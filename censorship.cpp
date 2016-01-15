@@ -114,7 +114,7 @@ int main(int argc, char *argv[])
 				}*/
 
 				long index = mpz_scan1(users, limite.first);
-				if (index <= limite.second && index > 0) {
+				if (index <= limite.second && index >= 0) {
                     adversario = true;
                 }
 
