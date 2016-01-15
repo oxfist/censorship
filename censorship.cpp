@@ -19,14 +19,11 @@ using namespace std;
 typedef pair<int, int> pii;
 
 void usage(char **argv);
-void activate_adversaries(mpz_t users, const int n, const int k);
-void print_bitset(mpz_t users, const int n);
+void activate_adversaries(mpz_t users, const int &n, const int &k);
 unsigned long mix(unsigned long a, unsigned long b, unsigned long c);
 
-int main(int argc, char *argv[])
-{
-	if (argc >= 3)
-	{
+int main(int argc, char *argv[]) {
+	if (argc >= 3) {
         bool adversario;
         int i, n, k, identificados, claves, tam_grupo, resto, inicio;
         pii limite, nuevo_limite;
@@ -42,9 +39,7 @@ int main(int argc, char *argv[])
 		n = atoi(argv[1]);
 		k = atoi(argv[2]);
 
-
 		/* Vector para almacenar usuarios, n bits */
-		//vector<bool> users(n);
 		mpz_init2(users, n);
 
         srand(seed);
@@ -56,14 +51,12 @@ int main(int argc, char *argv[])
 		if (resto > 0) {
 			inicio = 0;
 			/* k-resto grupos */
-			for (i = 0; i < k-resto; i++)
-			{
+			for (i = 0; i < k-resto; i++) {
 				grupos.push(make_pair(inicio, inicio + tam_grupo - 1));
 				inicio += tam_grupo;
 			}
 			/* resto grupos */
-			for (i = 0; i < resto; i++)
-			{
+			for (i = 0; i < resto; i++) {
 				grupos.push(make_pair(inicio, inicio + tam_grupo));
 				inicio += tam_grupo+1;
 			}
@@ -82,8 +75,7 @@ int main(int argc, char *argv[])
 		claves = k;
 		
 		/* Iteramos mientras no hayamos identificado todos los adversarios */
-		while (identificados < k)
-		{
+		while (identificados < k) {
 			/* Revisamos el grupo para ver si hay algún adversario.
 			 * Recordar que una restricción de nuestra implementación es
 			 * que el adversario compromete la clave inmediatamente, lo que
@@ -96,23 +88,10 @@ int main(int argc, char *argv[])
 			
 			/* Si el grupo consiste en un solo usuario, significa que hemos
 			 * logrado identificar al adversario */
-			if (limite.first == limite.second)
-			{
+			if (limite.first == limite.second) {
 				if (mpz_tstbit(users, limite.first))
 					identificados++;
-			}
-			else
-			{
-			    // TODO: cambiar por mpz_scan1()
-				/*for (i = limite.first; i <= limite.second; i++)
-				{
-					if (mpz_tstbit(users, i))
-					{
-						adversario = true;
-						break;
-                    }
-				}*/
-
+			} else {
 				long index = mpz_scan1(users, limite.first);
 				if (index <= limite.second && index >= 0) {
                     adversario = true;
@@ -120,8 +99,7 @@ int main(int argc, char *argv[])
 
 				/* Adversario encontrado, dividir el grupo en dos subgrupos
 				 * y asignar dos nuevas claves */
-				if (adversario)
-				{
+				if (adversario) {
 					nuevo_limite = make_pair(limite.first, limite.first + avg(limite.second, limite.first));
 					grupos.push(nuevo_limite);
 					nuevo_limite = make_pair(nuevo_limite.second + 1, limite.second);
@@ -141,7 +119,7 @@ int main(int argc, char *argv[])
 	return 0;
 }
 
-void activate_adversaries(mpz_t users, const int n, const int k) {
+void activate_adversaries(mpz_t users, const int &n, const int &k) {
     for (int i = 0; i < k; i++) {
         while (true) {
             int adv_index = rand() % n;
@@ -151,13 +129,6 @@ void activate_adversaries(mpz_t users, const int n, const int k) {
             }
         }
     }
-}
-
-void print_bitset(mpz_t users, const int n) {
-    for (int i = 0; i < n; i++) {
-        cout << (mpz_tstbit(users, i) ? "1 " : "0 ");
-    }
-    cout << endl;
 }
 
 void usage(char **argv) {
