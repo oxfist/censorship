@@ -101,14 +101,20 @@ int main(int argc, char *argv[])
 			}
 			else
 			{
-				for (i = limite.first; i <= limite.second; i++)
+			    // TODO: cambiar por mpz_scan1()
+				/*for (i = limite.first; i <= limite.second; i++)
 				{
 					if (mpz_tstbit(users, i))
 					{
 						adversario = true;
 						break;
                     }
-				}
+				}*/
+
+				long index = mpz_scan1(users, limite.first);
+				if (index <= limite.second && index > 0) {
+                    adversario = true;
+                }
 
 				/* Adversario encontrado, dividir el grupo en dos subgrupos
 				 * y asignar dos nuevas claves */
