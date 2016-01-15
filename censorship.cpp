@@ -28,7 +28,7 @@ int main(int argc, char *argv[])
 	if (argc >= 3)
 	{
         bool adversario;
-        int i, j, n, k, identificados, claves, tam_grupo, resto, inicio;
+        int i, n, k, identificados, claves, tam_grupo, resto, inicio;
         pii limite, nuevo_limite;
         queue<pii> grupos;
         mpz_t users;
