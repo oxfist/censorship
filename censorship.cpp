@@ -18,16 +18,16 @@ using namespace std;
 typedef pair<int, int> pii;
 
 void usage(char **argv);
-void activate_adversaries(mpz_t users, const int &n, const int &k);
+void asignar_adversarios(mpz_t users, const int &n, const int &k);
 unsigned long mix(unsigned long a, unsigned long b, unsigned long c);
 
 int main(int argc, char *argv[]) {
 	if (argc >= 3) {
         bool adversario;
-        int i, n, k, identificados, claves, tam_grupo, resto, inicio;
+        int i, n, k, identificados, claves, tam_grupo, resto, inicio, index;
         pii limite, nuevo_limite;
         queue<pii> grupos;
-        mpz_t users;
+        mpz_t usuarios;
         unsigned long seed = mix(clock(), time(NULL), getpid());
         time_586 start, stop;
 
@@ -39,7 +39,7 @@ int main(int argc, char *argv[]) {
 		k = atoi(argv[2]);
 
 		/* Bitset para almacenar usuarios, n bits */
-		mpz_init2(users, n);
+		mpz_init2(usuarios, n);
 
         srand(seed);
 		time2(start);
@@ -67,7 +67,7 @@ int main(int argc, char *argv[]) {
                 inicio += tam_grupo;
             }
         }
-        activate_adversaries(users, n, k);
+        asignar_adversarios(usuarios, n, k);
 		
 		/* En un comienzo no hay adversarios identificados y hay k claves
 		 * distribuidas (una para cada grupo) */
@@ -87,12 +87,12 @@ int main(int argc, char *argv[]) {
 			/* Si el grupo consiste en un solo usuario, significa que hemos
 			 * logrado identificar al adversario */
 			if (limite.first == limite.second) {
-				if (mpz_tstbit(users, limite.first))
+				if (mpz_tstbit(usuarios, limite.first))
 					identificados++;
 			} else {
-                /* Buscamos el adversario en el bitset, en los rangos limite.first
-                 * y limite.second */
-				long index = mpz_scan1(users, limite.first);
+                /* Buscamos el adversario en el bitset, entre los rangos 
+                 * limite.first y limite.second */
+				index = mpz_scan1(usuarios, limite.first);
 				if (index <= limite.second && index >= 0) {
                     adversario = true;
                 }
@@ -109,7 +109,7 @@ int main(int argc, char *argv[]) {
 			}
 		}
 		time2(stop);
-		mpz_clear(users);
+		mpz_clear(usuarios);
         /* Output: claves encontradas y tiempo de ejecución */
         printf("%d %.20fs\n", claves, time_diff(stop, start) / 1000000.0);
 	} else {
@@ -120,12 +120,12 @@ int main(int argc, char *argv[]) {
 
 /* Asignar posiciones iniciales para los adversarios en el bitset de usuarios.
  * Las posiciones se asignan aleatoriamente dentro de todo el conjunto */
-void activate_adversaries(mpz_t users, const int &n, const int &k) {
+void asignar_adversarios(mpz_t usuarios, const int &n, const int &k) {
     for (int i = 0; i < k; i++) {
         while (true) {
             int adv_index = rand() % n;
-            if (!mpz_tstbit(users, adv_index)) {
-                mpz_setbit(users, adv_index);
+            if (!mpz_tstbit(usuarios, adv_index)) {
+                mpz_setbit(usuarios, adv_index);
                 break;
             }
         }
