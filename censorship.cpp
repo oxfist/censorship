@@ -2,10 +2,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <ctime>
-#include <iostream>
 #include <queue>
-#include <utility>
-#include <vector>
 #include <gmp.h>
 #include <unistd.h>
 #include <sys/types.h>
@@ -16,6 +13,8 @@
 
 using namespace std;
 
+/* Par de enteros para almacenar límite inicial y final de un subgrupo
+ * de usuarios a partir del grupo inicial */
 typedef pair<int, int> pii;
 
 void usage(char **argv);
@@ -39,31 +38,32 @@ int main(int argc, char *argv[]) {
 		n = atoi(argv[1]);
 		k = atoi(argv[2]);
 
-		/* Vector para almacenar usuarios, n bits */
+		/* Bitset para almacenar usuarios, n bits */
 		mpz_init2(users, n);
 
         srand(seed);
-		
 		time2(start);
+
 		/* Inicialmente creamos k grupos */
 		tam_grupo = floor(n/k);
 		resto = n%k;
+        inicio = 0;
 		if (resto > 0) {
-			inicio = 0;
-			/* k-resto grupos */
+			/* Creamos 'k-resto' grupos de tamaño tam_grupo */
 			for (i = 0; i < k-resto; i++) {
-				grupos.push(make_pair(inicio, inicio + tam_grupo - 1));
+				grupos.push(make_pair(inicio, inicio + tam_grupo-1));
 				inicio += tam_grupo;
 			}
-			/* resto grupos */
+			/* Creamos 'resto' grupos de tamaño tam_grupo+1 */
 			for (i = 0; i < resto; i++) {
 				grupos.push(make_pair(inicio, inicio + tam_grupo));
 				inicio += tam_grupo+1;
 			}
 		} else {
-		    inicio = 0;
-            for (i = 0; i < tam_grupo; i++) {
-                grupos.push(make_pair(inicio, inicio + tam_grupo));
+            /* Si la división es exacta, simplemente creamos 'k' grupos
+             * de tamaño tam_grupo */
+            for (i = 0; i < k; i++) {
+                grupos.push(make_pair(inicio, inicio + tam_grupo-1));
                 inicio += tam_grupo;
             }
         }
@@ -83,22 +83,22 @@ int main(int argc, char *argv[]) {
 			 * que la clave está comprometida y debemos dividir el grupo. */
 			limite = grupos.front();
 			grupos.pop();
-
 			adversario = false;
-			
 			/* Si el grupo consiste en un solo usuario, significa que hemos
 			 * logrado identificar al adversario */
 			if (limite.first == limite.second) {
 				if (mpz_tstbit(users, limite.first))
 					identificados++;
 			} else {
+                /* Buscamos el adversario en el bitset, en los rangos limite.first
+                 * y limite.second */
 				long index = mpz_scan1(users, limite.first);
 				if (index <= limite.second && index >= 0) {
                     adversario = true;
                 }
 
-				/* Adversario encontrado, dividir el grupo en dos subgrupos
-				 * y asignar dos nuevas claves */
+				/* Adversario encontrado, dividir el grupo en dos subgrupos.
+				 * Revocamos clave antigua y asignamos dos nuevas */
 				if (adversario) {
 					nuevo_limite = make_pair(limite.first, limite.first + avg(limite.second, limite.first));
 					grupos.push(nuevo_limite);
@@ -109,9 +109,8 @@ int main(int argc, char *argv[]) {
 			}
 		}
 		time2(stop);
-		
 		mpz_clear(users);
-		
+        /* Output: claves encontradas y tiempo de ejecución */
         printf("%d %.20fs\n", claves, time_diff(stop, start) / 1000000.0);
 	} else {
 	    usage(argv);
@@ -119,6 +118,8 @@ int main(int argc, char *argv[]) {
 	return 0;
 }
 
+/* Asignar posiciones iniciales para los adversarios en el bitset de usuarios.
+ * Las posiciones se asignan aleatoriamente dentro de todo el conjunto */
 void activate_adversaries(mpz_t users, const int &n, const int &k) {
     for (int i = 0; i < k; i++) {
         while (true) {
@@ -137,7 +138,10 @@ void usage(char **argv) {
     printf("	k: Cantidad de adversarios. k << n\n\n");
 }
 
-/* Función creada por Robert Jenkins. */
+/* Función creada por Robert Jenkins. Genera un seed único para cada
+ * ejecución, independiente que éstas sean dentro del mismo ciclo
+ * de reloj. En este caso, permite obtener distintas asignaciones
+ * (aleatorias) de adversarios dentro del grupo de usuarios. */
 unsigned long mix(unsigned long a, unsigned long b, unsigned long c) {
     a=a-b;  a=a-c;  a=a^(c >> 13);
     b=b-c;  b=b-a;  b=b^(a << 8);
