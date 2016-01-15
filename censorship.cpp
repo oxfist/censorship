@@ -19,6 +19,8 @@ using namespace std;
 typedef pair<int, int> pii;
 
 void usage(char **argv);
+void activate_adversaries(mpz_t users, const int n, const int k);
+void print_bitset(mpz_t users, const int n);
 unsigned long mix(unsigned long a, unsigned long b, unsigned long c);
 
 int main(int argc, char *argv[])
@@ -51,28 +53,28 @@ int main(int argc, char *argv[])
 		/* Inicialmente creamos k grupos */
 		tam_grupo = floor(n/k);
 		resto = n%k;
-		if (resto > 0)
-		{
+		if (resto > 0) {
 			inicio = 0;
 			/* k-resto grupos */
 			for (i = 0; i < k-resto; i++)
 			{
-				grupos.push(make_pair(inicio, inicio + tam_grupo-1));
-				/* Activar adversario en posición aleatoria */
-				j = rand()%tam_grupo;
-				mpz_setbit(users, inicio + j);
+				grupos.push(make_pair(inicio, inicio + tam_grupo - 1));
 				inicio += tam_grupo;
 			}
 			/* resto grupos */
 			for (i = 0; i < resto; i++)
 			{
 				grupos.push(make_pair(inicio, inicio + tam_grupo));
-				/* Activar adversario en posición aleatoria */
-				j = rand()%tam_grupo;
-				mpz_setbit(users, inicio + j);
 				inicio += tam_grupo+1;
 			}
-		}
+		} else {
+		    inicio = 0;
+            for (i = 0; i < tam_grupo; i++) {
+                grupos.push(make_pair(inicio, inicio + tam_grupo));
+                inicio += tam_grupo;
+            }
+        }
+        activate_adversaries(users, n, k);
 		
 		/* En un comienzo no hay adversarios identificados y hay k claves
 		 * distribuidas (una para cada grupo) */
@@ -137,6 +139,25 @@ int main(int argc, char *argv[])
 	    usage(argv);
 	}	
 	return 0;
+}
+
+void activate_adversaries(mpz_t users, const int n, const int k) {
+    for (int i = 0; i < k; i++) {
+        while (true) {
+            int adv_index = rand() % n;
+            if (!mpz_tstbit(users, adv_index)) {
+                mpz_setbit(users, adv_index);
+                break;
+            }
+        }
+    }
+}
+
+void print_bitset(mpz_t users, const int n) {
+    for (int i = 0; i < n; i++) {
+        cout << (mpz_tstbit(users, i) ? "1 " : "0 ");
+    }
+    cout << endl;
 }
 
 void usage(char **argv) {
