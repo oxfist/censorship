@@ -18,7 +18,7 @@ using namespace std;
 typedef pair<int, int> pii;
 
 void usage(char **argv);
-void asignar_adversarios(mpz_t users, const int &n, const int &k);
+void asignar_adversarios(mpz_t usuarios, const int &n, const int &k);
 unsigned long mix(unsigned long a, unsigned long b, unsigned long c);
 
 int main(int argc, char *argv[]) {
