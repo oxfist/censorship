@@ -22,7 +22,7 @@ void asignar_adversarios(mpz_t users, const int &n, const int &k);
 unsigned long mix(unsigned long a, unsigned long b, unsigned long c);
 
 int main(int argc, char *argv[]) {
-	if (argc >= 3) {
+    if (argc >= 3) {
         bool adversario;
         int i, n, k, identificados, claves, tam_grupo, resto, inicio, index;
         pii limite, nuevo_limite;
@@ -31,35 +31,35 @@ int main(int argc, char *argv[]) {
         unsigned long seed = mix(clock(), time(NULL), getpid());
         time_586 start, stop;
 
-		/* Argumentos del programa.
-		 * n = cantidad de usuarios.
-		 * k = cantidad de adversarios
-		 */
-		n = atoi(argv[1]);
-		k = atoi(argv[2]);
+        /* Argumentos del programa.
+         * n = cantidad de usuarios.
+         * k = cantidad de adversarios
+         */
+        n = atoi(argv[1]);
+        k = atoi(argv[2]);
 
-		/* Bitset para almacenar usuarios, n bits */
-		mpz_init2(usuarios, n);
+        /* Bitset para almacenar usuarios, n bits */
+        mpz_init2(usuarios, n);
 
         srand(seed);
-		time2(start);
+        time2(start);
 
-		/* Inicialmente creamos k grupos */
-		tam_grupo = floor(n/k);
-		resto = n%k;
+        /* Inicialmente creamos k grupos */
+        tam_grupo = floor(n/k);
+        resto = n%k;
         inicio = 0;
-		if (resto > 0) {
-			/* Creamos 'k-resto' grupos de tamaño tam_grupo */
-			for (i = 0; i < k-resto; i++) {
-				grupos.push(make_pair(inicio, inicio + tam_grupo-1));
-				inicio += tam_grupo;
-			}
-			/* Creamos 'resto' grupos de tamaño tam_grupo+1 */
-			for (i = 0; i < resto; i++) {
-				grupos.push(make_pair(inicio, inicio + tam_grupo));
-				inicio += tam_grupo+1;
-			}
-		} else {
+        if (resto > 0) {
+            /* Creamos 'k-resto' grupos de tamaño tam_grupo */
+            for (i = 0; i < k-resto; i++) {
+                grupos.push(make_pair(inicio, inicio + tam_grupo-1));
+                inicio += tam_grupo;
+            }
+            /* Creamos 'resto' grupos de tamaño tam_grupo+1 */
+            for (i = 0; i < resto; i++) {
+                grupos.push(make_pair(inicio, inicio + tam_grupo));
+                inicio += tam_grupo+1;
+            }
+        } else {
             /* Si la división es exacta, simplemente creamos 'k' grupos
              * de tamaño tam_grupo */
             for (i = 0; i < k; i++) {
@@ -68,54 +68,54 @@ int main(int argc, char *argv[]) {
             }
         }
         asignar_adversarios(usuarios, n, k);
-		
-		/* En un comienzo no hay adversarios identificados y hay k claves
-		 * distribuidas (una para cada grupo) */
-		identificados = 0;
-		claves = k;
-		
-		/* Iteramos mientras no hayamos identificado todos los adversarios */
-		while (identificados < k) {
-			/* Revisamos el grupo para ver si hay algún adversario.
-			 * Recordar que una restricción de nuestra implementación es
-			 * que el adversario compromete la clave inmediatamente, lo que
-			 * significa que al encontrar un adversario podemos considerar
-			 * que la clave está comprometida y debemos dividir el grupo. */
-			limite = grupos.front();
-			grupos.pop();
-			adversario = false;
-			/* Si el grupo consiste en un solo usuario, significa que hemos
-			 * logrado identificar al adversario */
-			if (limite.first == limite.second) {
-				if (mpz_tstbit(usuarios, limite.first))
-					identificados++;
-			} else {
-                /* Buscamos el adversario en el bitset, entre los rangos 
+
+        /* En un comienzo no hay adversarios identificados y hay k claves
+         * distribuidas (una para cada grupo) */
+        identificados = 0;
+        claves = k;
+
+        /* Iteramos mientras no hayamos identificado todos los adversarios */
+        while (identificados < k) {
+            /* Revisamos el grupo para ver si hay algún adversario.
+             * Recordar que una restricción de nuestra implementación es
+             * que el adversario compromete la clave inmediatamente, lo que
+             * significa que al encontrar un adversario podemos considerar
+             * que la clave está comprometida y debemos dividir el grupo. */
+            limite = grupos.front();
+            grupos.pop();
+            adversario = false;
+            /* Si el grupo consiste en un solo usuario, significa que hemos
+             * logrado identificar al adversario */
+            if (limite.first == limite.second) {
+                if (mpz_tstbit(usuarios, limite.first))
+                    identificados++;
+            } else {
+                /* Buscamos el adversario en el bitset, entre los rangos
                  * limite.first y limite.second */
-				index = mpz_scan1(usuarios, limite.first);
-				if (index <= limite.second && index >= 0) {
+                index = mpz_scan1(usuarios, limite.first);
+                if (index <= limite.second && index >= 0) {
                     adversario = true;
                 }
 
-				/* Adversario encontrado, dividir el grupo en dos subgrupos.
-				 * Revocamos clave antigua y asignamos dos nuevas */
-				if (adversario) {
-					nuevo_limite = make_pair(limite.first, limite.first + avg(limite.second, limite.first));
-					grupos.push(nuevo_limite);
-					nuevo_limite = make_pair(nuevo_limite.second + 1, limite.second);
-					grupos.push(nuevo_limite);
-					claves += 1;
-				}
-			}
-		}
-		time2(stop);
-		mpz_clear(usuarios);
+                /* Adversario encontrado, dividir el grupo en dos subgrupos.
+                 * Revocamos clave antigua y asignamos dos nuevas */
+                if (adversario) {
+                    nuevo_limite = make_pair(limite.first, limite.first + avg(limite.second, limite.first));
+                    grupos.push(nuevo_limite);
+                    nuevo_limite = make_pair(nuevo_limite.second + 1, limite.second);
+                    grupos.push(nuevo_limite);
+                    claves += 1;
+                }
+            }
+        }
+        time2(stop);
+        mpz_clear(usuarios);
         /* Output: claves encontradas y tiempo de ejecución */
         printf("%d %.20fs\n", claves, time_diff(stop, start) / 1000000.0);
-	} else {
-	    usage(argv);
-	}	
-	return 0;
+    } else {
+        usage(argv);
+    }
+    return 0;
 }
 
 /* Asignar posiciones iniciales para los adversarios en el bitset de usuarios.
@@ -134,8 +134,8 @@ void asignar_adversarios(mpz_t usuarios, const int &n, const int &k) {
 
 void usage(char **argv) {
     printf("\nUsage: %s n k\n", argv[0]);
-    printf("	n: Cantidad de usuarios\n");
-    printf("	k: Cantidad de adversarios. k << n\n\n");
+    printf("    n: Cantidad de usuarios\n");
+    printf("    k: Cantidad de adversarios. k << n\n\n");
 }
 
 /* Función creada por Robert Jenkins. Genera un seed único para cada
