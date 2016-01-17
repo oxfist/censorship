@@ -92,17 +92,31 @@ int main(int argc, char *argv[]) {
         while (identificados < k) {
             pthread_mutex_unlock(&mutex_identificados);
             pthread_mutex_lock(&mutex_grupos);
+            /* En este instante de tiempo puede que no haya grupos pendientes
+             * por procesar, lo que no significa, necesariamente, que todos los
+             * adversarios fueron identificados. De ser así, se va a seguir
+             * iterando hasta que se agregue un nuevo grupo a procesar a la queue.
+             */
             while (grupos.size() > 0) {
                 pthread_mutex_unlock(&mutex_grupos);
                 pthread_mutex_lock(&mutex_thread_pool);
+
+                /* Si bien puede haber grupos pendientes por procesar, puede
+                 * ocurrir que en este instante de tiempo todos los threads
+                 * estén ocupados. De ser así, se sigue iterando hasta que
+                 * un thread se desocupe.
+                 */
                 if (thread_pool.size() > 0) {
+                    /* Se guarda el id del primer thread que está desocupado. */
                     thread_activo = thread_pool.front();
                     thread_pool.pop();
                 } else {
                     pthread_mutex_unlock(&mutex_thread_pool);
+                    /* Si no hay threads disponibles, se espera hasta que uno lo esté. */
                     while (true) {
                         pthread_mutex_lock(&mutex_thread_pool);
                         if (thread_pool.size() > 0) {
+                            /* Se guarda el id del primer thread que está desocupado. */
                             thread_activo = thread_pool.front();
                             thread_pool.pop();
                             break;
@@ -111,6 +125,7 @@ int main(int argc, char *argv[]) {
                     }
                 }
                 pthread_mutex_unlock(&mutex_thread_pool);
+                /* Se envía trabajo al thread desocupado. */
                 rc = pthread_create(&threads[thread_activo], &attr, PrintHello, (void *) thread_activo);
                 if (rc) {
                     std::cout << "ERROR; return code from pthread_create() is " << rc << std::endl;
@@ -136,6 +151,7 @@ void *PrintHello(void *thread_id) {
     int limite_inferior, limite_superior;
     bool adversario = false;
     Limites limites_grupo_actual;
+
     pthread_mutex_lock(&mutex_grupos);
     /* Revisamos el grupo para ver si hay algún adversario.
      * Recordar que una restricción de nuestra implementación es
@@ -145,6 +161,7 @@ void *PrintHello(void *thread_id) {
     limites_grupo_actual = grupos.front();
     grupos.pop();
     pthread_mutex_unlock(&mutex_grupos);
+
     limite_inferior = limites_grupo_actual.first;
     limite_superior = limites_grupo_actual.second;
     /* Si el grupo consiste en un solo usuario, significa que hemos
@@ -168,22 +185,28 @@ void *PrintHello(void *thread_id) {
         if (adversario) {
             int avg_limites = avg(limite_superior, limite_inferior);
             Limites nuevos_limites = std::make_pair(limite_inferior, limite_inferior + avg_limites);
+
             pthread_mutex_lock(&mutex_grupos);
             grupos.push(nuevos_limites);
             nuevos_limites = std::make_pair(nuevos_limites.second + 1, limite_superior);
             grupos.push(nuevos_limites);
             pthread_mutex_unlock(&mutex_grupos);
+
             pthread_mutex_lock(&mutex_claves);
             claves += 1;
             pthread_mutex_unlock(&mutex_claves);
         }
     }
     pthread_mutex_lock(&mutex_thread_pool);
+    /* El thread se encola a sí mismo, indicando que está disponible. */
     thread_pool.push((unsigned long) thread_id);
     pthread_mutex_unlock(&mutex_thread_pool);
+
     pthread_exit(EXIT_SUCCESS);
 }
 
+/* Se encolan todos los identificadores de los threads a utilizar, lo que
+ * servirá como una pool de threads. */
 void init_thread_pool(int m) {
     for (int i = 0; i < m; i++) {
         thread_pool.push(i);
