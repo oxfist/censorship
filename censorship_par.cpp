@@ -2,6 +2,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <ctime>
+#include <iostream>
 #include <queue>
 #include <pthread.h>
 #include <gmp.h>
@@ -12,111 +13,181 @@
 
 #define avg(x, y) ((x - y) / 2)
 
-using namespace std;
-
 /* Par de enteros para almacenar límite inicial y final de un subgrupo
  * de usuarios a partir del grupo inicial */
-typedef pair<int, int> pii;
+typedef std::pair<int, int> Limites;
+
+pthread_mutex_t mutex_thread_pool, mutex_grupos, mutex_identificados, mutex_claves;
+std::queue<Limites> grupos;
+std::queue<unsigned long> thread_pool;
+mpz_t usuarios;
+
+/* En un comienzo no hay adversarios identificados */
+int identificados, claves;
 
 void usage(char **argv);
-void asignar_adversarios(mpz_t users, const int &n, const int &k);
+void *PrintHello(void *thread_id);
+void init_thread_pool(int m);
+void asignar_adversarios(mpz_t usuarios, const int &n, const int &k);
 unsigned long mix(unsigned long a, unsigned long b, unsigned long c);
 
 int main(int argc, char *argv[]) {
-	if (argc >= 3) {
-        bool adversario;
-        int i, n, k, identificados, claves, tam_grupo, resto, inicio, index;
-        pii limite, nuevo_limite;
-        queue<pii> grupos;
-        mpz_t usuarios;
+    if (argc >= 4) {
+        int n, m, k, tam_grupo, resto, inicio, rc;
+        unsigned long thread_activo;
         unsigned long seed = mix(clock(), time(NULL), getpid());
         time_586 start, stop;
 
-		/* Argumentos del programa.
-		 * n = cantidad de usuarios.
-		 * k = cantidad de adversarios
-		 */
-		n = atoi(argv[1]);
-		k = atoi(argv[2]);
+        /* Argumentos del programa.
+         * n = cantidad de usuarios.
+         * k = cantidad de adversarios
+         */
+        n = atoi(argv[1]);
+        k = atoi(argv[2]);
+        m = atoi(argv[3]);
 
-		/* Bitset para almacenar usuarios, n bits */
-		mpz_init2(usuarios, n);
+        pthread_t threads[m];
+        init_thread_pool(m);
+        pthread_attr_t attr;
+
+        pthread_attr_init(&attr);
+        pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
+
+        /* Bitset para almacenar usuarios, n bits */
+        mpz_init2(usuarios, n);
 
         srand(seed);
-		time2(start);
+        time2(start);
 
-		/* Inicialmente creamos k grupos */
-		tam_grupo = floor(n/k);
-		resto = n%k;
+        /* Inicialmente creamos k grupos */
+        tam_grupo = floor(n / k);
+        resto = n % k;
         inicio = 0;
-		if (resto > 0) {
-			/* Creamos 'k-resto' grupos de tamaño tam_grupo */
-			for (i = 0; i < k-resto; i++) {
-				grupos.push(make_pair(inicio, inicio + tam_grupo-1));
-				inicio += tam_grupo;
-			}
-			/* Creamos 'resto' grupos de tamaño tam_grupo+1 */
-			for (i = 0; i < resto; i++) {
-				grupos.push(make_pair(inicio, inicio + tam_grupo));
-				inicio += tam_grupo+1;
-			}
-		} else {
+        if (resto > 0) {
+            /* Creamos 'k-resto' grupos de tamaño tam_grupo */
+            for (int i = 0; i < k-resto; i++) {
+                grupos.push(std::make_pair(inicio, inicio + tam_grupo - 1));
+                inicio += tam_grupo;
+            }
+            /* Creamos 'resto' grupos de tamaño tam_grupo+1 */
+            for (int i = 0; i < resto; i++) {
+                grupos.push(std::make_pair(inicio, inicio + tam_grupo));
+                inicio += tam_grupo+1;
+            }
+        } else {
             /* Si la división es exacta, simplemente creamos 'k' grupos
              * de tamaño tam_grupo */
-            for (i = 0; i < k; i++) {
-                grupos.push(make_pair(inicio, inicio + tam_grupo-1));
+            for (int i = 0; i < k; i++) {
+                grupos.push(std::make_pair(inicio, inicio + tam_grupo - 1));
                 inicio += tam_grupo;
             }
         }
         asignar_adversarios(usuarios, n, k);
-		
-		/* En un comienzo no hay adversarios identificados y hay k claves
-		 * distribuidas (una para cada grupo) */
-		identificados = 0;
-		claves = k;
-		
-		/* Iteramos mientras no hayamos identificado todos los adversarios */
-		while (identificados < k) {
-			/* Revisamos el grupo para ver si hay algún adversario.
-			 * Recordar que una restricción de nuestra implementación es
-			 * que el adversario compromete la clave inmediatamente, lo que
-			 * significa que al encontrar un adversario podemos considerar
-			 * que la clave está comprometida y debemos dividir el grupo. */
-			limite = grupos.front();
-			grupos.pop();
-			adversario = false;
-			/* Si el grupo consiste en un solo usuario, significa que hemos
-			 * logrado identificar al adversario */
-			if (limite.first == limite.second) {
-				if (mpz_tstbit(usuarios, limite.first))
-					identificados++;
-			} else {
-                /* Buscamos el adversario en el bitset, entre los rangos 
-                 * limite.first y limite.second */
-				index = mpz_scan1(usuarios, limite.first);
-				if (index <= limite.second && index >= 0) {
-                    adversario = true;
-                }
 
-				/* Adversario encontrado, dividir el grupo en dos subgrupos.
-				 * Revocamos clave antigua y asignamos dos nuevas */
-				if (adversario) {
-					nuevo_limite = make_pair(limite.first, limite.first + avg(limite.second, limite.first));
-					grupos.push(nuevo_limite);
-					nuevo_limite = make_pair(nuevo_limite.second + 1, limite.second);
-					grupos.push(nuevo_limite);
-					claves += 1;
-				}
-			}
-		}
-		time2(stop);
-		mpz_clear(usuarios);
+        /* En un comienzo hay k claves distribuidas (una para cada grupo) */
+        claves = k;
+
+        /* Iteramos mientras no hayamos identificado todos los adversarios */
+        pthread_mutex_lock(&mutex_identificados);
+        while (identificados < k) {
+            pthread_mutex_unlock(&mutex_identificados);
+            pthread_mutex_lock(&mutex_grupos);
+            while (grupos.size() > 0) {
+                pthread_mutex_unlock(&mutex_grupos);
+                pthread_mutex_lock(&mutex_thread_pool);
+                if (thread_pool.size() > 0) {
+                    thread_activo = thread_pool.front();
+                    thread_pool.pop();
+                } else {
+                    pthread_mutex_unlock(&mutex_thread_pool);
+                    while (true) {
+                        pthread_mutex_lock(&mutex_thread_pool);
+                        if (thread_pool.size() > 0) {
+                            thread_activo = thread_pool.front();
+                            thread_pool.pop();
+                            break;
+                        }
+                        pthread_mutex_unlock(&mutex_thread_pool);
+                    }
+                }
+                pthread_mutex_unlock(&mutex_thread_pool);
+                rc = pthread_create(&threads[thread_activo], &attr, PrintHello, (void *) thread_activo);
+                if (rc) {
+                    std::cout << "ERROR; return code from pthread_create() is " << rc << std::endl;
+                    return(EXIT_FAILURE);
+                }
+                pthread_mutex_lock(&mutex_grupos);
+            }
+            pthread_mutex_unlock(&mutex_grupos);
+            pthread_mutex_lock(&mutex_identificados);
+        }
+        pthread_mutex_unlock(&mutex_identificados);
+        time2(stop);
+        mpz_clear(usuarios);
         /* Output: claves encontradas y tiempo de ejecución */
         printf("%d %.20fs\n", claves, time_diff(stop, start) / 1000000.0);
-	} else {
-	    usage(argv);
-	}	
-	return 0;
+    } else {
+        usage(argv);
+    }
+    pthread_exit(EXIT_SUCCESS);
+}
+
+void *PrintHello(void *thread_id) {
+    int limite_inferior, limite_superior;
+    bool adversario = false;
+    Limites limites_grupo_actual;
+    pthread_mutex_lock(&mutex_grupos);
+    /* Revisamos el grupo para ver si hay algún adversario.
+     * Recordar que una restricción de nuestra implementación es
+     * que el adversario compromete la clave inmediatamente, lo que
+     * significa que al encontrar un adversario podemos considerar
+     * que la clave está comprometida y debemos dividir el grupo. */
+    limites_grupo_actual = grupos.front();
+    grupos.pop();
+    pthread_mutex_unlock(&mutex_grupos);
+    limite_inferior = limites_grupo_actual.first;
+    limite_superior = limites_grupo_actual.second;
+    /* Si el grupo consiste en un solo usuario, significa que hemos
+     * logrado identificar al adversario */
+    if (limite_inferior == limite_superior) {
+        if (mpz_tstbit(usuarios, limite_inferior)) {
+            pthread_mutex_lock(&mutex_identificados);
+            identificados++;
+            pthread_mutex_unlock(&mutex_identificados);
+        }
+    } else {
+        /* Buscamos el adversario en el bitset, entre los rangos
+         * limite.first y limite.second */
+        int index = mpz_scan1(usuarios, limite_inferior);
+        if (index <= limite_superior && index >= 0) {
+            adversario = true;
+        }
+
+        /* Adversario encontrado, dividir el grupo en dos subgrupos.
+         * Revocamos clave antigua y asignamos dos nuevas */
+        if (adversario) {
+            int avg_limites = avg(limite_superior, limite_inferior);
+            Limites nuevos_limites = std::make_pair(limite_inferior, limite_inferior + avg_limites);
+            pthread_mutex_lock(&mutex_grupos);
+            grupos.push(nuevos_limites);
+            nuevos_limites = std::make_pair(nuevos_limites.second + 1, limite_superior);
+            grupos.push(nuevos_limites);
+            pthread_mutex_unlock(&mutex_grupos);
+            pthread_mutex_lock(&mutex_claves);
+            claves += 1;
+            pthread_mutex_unlock(&mutex_claves);
+        }
+    }
+    pthread_mutex_lock(&mutex_thread_pool);
+    thread_pool.push((unsigned long) thread_id);
+    pthread_mutex_unlock(&mutex_thread_pool);
+    pthread_exit(EXIT_SUCCESS);
+}
+
+void init_thread_pool(int m) {
+    for (int i = 0; i < m; i++) {
+        thread_pool.push(i);
+    }
 }
 
 /* Asignar posiciones iniciales para los adversarios en el bitset de usuarios.
@@ -135,8 +206,9 @@ void asignar_adversarios(mpz_t usuarios, const int &n, const int &k) {
 
 void usage(char **argv) {
     printf("\nUsage: %s n k\n", argv[0]);
-    printf("	n: Cantidad de usuarios\n");
-    printf("	k: Cantidad de adversarios. k << n\n\n");
+    printf("    n: Cantidad de usuarios\n");
+    printf("    k: Cantidad de adversarios. k << n\n");
+    printf("    m: Cantidad de threads a utlizar.\n");
 }
 
 /* Función creada por Robert Jenkins. Genera un seed único para cada
