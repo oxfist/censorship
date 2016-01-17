@@ -91,6 +91,7 @@ int main(int argc, char *argv[]) {
         pthread_mutex_lock(&mutex_identificados);
         while (identificados < k) {
             pthread_mutex_unlock(&mutex_identificados);
+
             pthread_mutex_lock(&mutex_grupos);
             /* En este instante de tiempo puede que no haya grupos pendientes
              * por procesar, lo que no significa, necesariamente, que todos los
@@ -99,8 +100,8 @@ int main(int argc, char *argv[]) {
              */
             while (grupos.size() > 0) {
                 pthread_mutex_unlock(&mutex_grupos);
-                pthread_mutex_lock(&mutex_thread_pool);
 
+                pthread_mutex_lock(&mutex_thread_pool);
                 /* Si bien puede haber grupos pendientes por procesar, puede
                  * ocurrir que en este instante de tiempo todos los threads
                  * estén ocupados. De ser así, se sigue iterando hasta que
@@ -134,6 +135,7 @@ int main(int argc, char *argv[]) {
                 pthread_mutex_lock(&mutex_grupos);
             }
             pthread_mutex_unlock(&mutex_grupos);
+
             pthread_mutex_lock(&mutex_identificados);
         }
         pthread_mutex_unlock(&mutex_identificados);
