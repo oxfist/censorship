@@ -50,6 +50,10 @@ int main(int argc, char *argv[]) {
         init_thread_pool(m);
         pthread_attr_t attr;
 
+        pthread_mutex_init(&mutex_thread_pool, NULL);
+        pthread_mutex_init(&mutex_grupos, NULL);
+        pthread_mutex_init(&mutex_identificados, NULL);
+        pthread_mutex_init(&mutex_claves, NULL);
         pthread_attr_init(&attr);
         pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
 
@@ -99,13 +103,15 @@ int main(int argc, char *argv[]) {
              * iterando hasta que se agregue un nuevo grupo a procesar a la queue.
              */
             while (grupos.size() > 0) {
+                //std::cout << "grupos: " << grupos.size() << std::endl;
                 pthread_mutex_unlock(&mutex_grupos);
 
                 pthread_mutex_lock(&mutex_thread_pool);
+                //std::cout << "thread_pool: " << thread_pool.size() << std::endl;
                 /* Si bien puede haber grupos pendientes por procesar, puede
                  * ocurrir que en este instante de tiempo todos los threads
-                 * estén ocupados. De ser así, se sigue iterando hasta que
-                 * un thread se desocupe.
+                 * estén ocupados. De ser así, se sigue iterando hasta que un
+                 * thread se desocupe.
                  */
                 if (thread_pool.size() > 0) {
                     /* Se guarda el id del primer thread que está desocupado. */
@@ -125,13 +131,10 @@ int main(int argc, char *argv[]) {
                         pthread_mutex_unlock(&mutex_thread_pool);
                     }
                 }
-                pthread_mutex_unlock(&mutex_thread_pool);
+                //std::cout << "thread activo: " << thread_activo << std::endl;
                 /* Se envía trabajo al thread desocupado. */
-                rc = pthread_create(&threads[thread_activo], &attr, PrintHello, (void *) thread_activo);
-                if (rc) {
-                    std::cout << "ERROR; return code from pthread_create() is " << rc << std::endl;
-                    return(EXIT_FAILURE);
-                }
+                pthread_create(&threads[thread_activo], &attr, PrintHello, (void *) thread_activo);
+                pthread_mutex_unlock(&mutex_thread_pool);
                 pthread_mutex_lock(&mutex_grupos);
             }
             pthread_mutex_unlock(&mutex_grupos);
@@ -140,12 +143,23 @@ int main(int argc, char *argv[]) {
         }
         pthread_mutex_unlock(&mutex_identificados);
         time2(stop);
+        while (true) {
+            pthread_mutex_lock(&mutex_thread_pool);
+            if (thread_pool.size() == m) {
+                break;
+            }
+            pthread_mutex_unlock(&mutex_thread_pool);
+        }
         mpz_clear(usuarios);
         /* Output: claves encontradas y tiempo de ejecución */
         printf("%d %.20fs\n", claves, time_diff(stop, start) / 1000000.0);
     } else {
         usage(argv);
     }
+    pthread_mutex_destroy(&mutex_thread_pool);
+    pthread_mutex_destroy(&mutex_grupos);
+    pthread_mutex_destroy(&mutex_identificados);
+    pthread_mutex_destroy(&mutex_claves);
     pthread_exit(EXIT_SUCCESS);
 }
 
@@ -160,6 +174,15 @@ void *PrintHello(void *thread_id) {
      * que el adversario compromete la clave inmediatamente, lo que
      * significa que al encontrar un adversario podemos considerar
      * que la clave está comprometida y debemos dividir el grupo. */
+    if (grupos.size() == 0) {
+        pthread_mutex_unlock(&mutex_grupos);
+        pthread_mutex_lock(&mutex_thread_pool);
+        /* El thread se encola a sí mismo, indicando que está disponible. */
+        thread_pool.push((unsigned long) thread_id);
+        pthread_mutex_unlock(&mutex_thread_pool);
+
+        pthread_exit(EXIT_SUCCESS);
+    }
     limites_grupo_actual = grupos.front();
     grupos.pop();
     pthread_mutex_unlock(&mutex_grupos);
@@ -176,7 +199,7 @@ void *PrintHello(void *thread_id) {
         }
     } else {
         /* Buscamos el adversario en el bitset, entre los rangos
-         * limite.first y limite.second */
+         * limite_inferior y limite_superior. */
         int index = mpz_scan1(usuarios, limite_inferior);
         if (index <= limite_superior && index >= 0) {
             adversario = true;
