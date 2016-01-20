@@ -26,14 +26,14 @@ mpz_t usuarios;
 unsigned int identificados, claves;
 
 void usage(char **argv);
-void *PrintHello(void *thread_id);
+void *check_groups(void *thread_id);
 void init_thread_pool(int m);
 void asignar_adversarios(mpz_t usuarios, const int &n, const int &k);
 unsigned long mix(unsigned long a, unsigned long b, unsigned long c);
 
 int main(int argc, char *argv[]) {
     if (argc >= 4) {
-        unsigned int n, m, k, tam_grupo, resto, inicio;
+        unsigned int n, p, k, tam_grupo, resto, inicio;
         unsigned long thread_activo;
         unsigned long seed = mix(clock(), time(NULL), getpid());
         time_586 start, stop;
@@ -41,13 +41,14 @@ int main(int argc, char *argv[]) {
         /* Argumentos del programa.
          * n = cantidad de usuarios.
          * k = cantidad de adversarios
+         * p = cantidad de threads
          */
         n = atoi(argv[1]);
         k = atoi(argv[2]);
-        m = atoi(argv[3]);
+        p = atoi(argv[3]);
 
-        pthread_t threads[m];
-        init_thread_pool(m);
+        pthread_t threads[p];
+        init_thread_pool(p);
         pthread_attr_t attr;
 
         pthread_mutex_init(&mutex_thread_pool, NULL);
@@ -103,7 +104,6 @@ int main(int argc, char *argv[]) {
              * iterando hasta que se agregue un nuevo grupo a procesar a la queue.
              */
             while (grupos.size() > 0) {
-                //std::cout << "grupos: " << grupos.size() << std::endl;
                 pthread_mutex_unlock(&mutex_grupos);
 
                 pthread_mutex_lock(&mutex_thread_pool);
@@ -131,9 +131,8 @@ int main(int argc, char *argv[]) {
                         pthread_mutex_unlock(&mutex_thread_pool);
                     }
                 }
-                //std::cout << "thread activo: " << thread_activo << std::endl;
                 /* Se envía trabajo al thread desocupado. */
-                pthread_create(&threads[thread_activo], &attr, PrintHello, (void *) thread_activo);
+                pthread_create(&threads[thread_activo], &attr, check_groups, (void *) thread_activo);
                 pthread_mutex_unlock(&mutex_thread_pool);
                 pthread_mutex_lock(&mutex_grupos);
             }
@@ -145,7 +144,7 @@ int main(int argc, char *argv[]) {
         time2(stop);
         while (true) {
             pthread_mutex_lock(&mutex_thread_pool);
-            if (thread_pool.size() == m) {
+            if (thread_pool.size() == p) {
                 break;
             }
             pthread_mutex_unlock(&mutex_thread_pool);
@@ -163,7 +162,7 @@ int main(int argc, char *argv[]) {
     pthread_exit(EXIT_SUCCESS);
 }
 
-void *PrintHello(void *thread_id) {
+void *check_groups(void *thread_id) {
     int limite_inferior, limite_superior;
     bool adversario = false;
     Limites limites_grupo_actual;
@@ -232,8 +231,8 @@ void *PrintHello(void *thread_id) {
 
 /* Se encolan todos los identificadores de los threads a utilizar, lo que
  * servirá como una pool de threads. */
-void init_thread_pool(int m) {
-    for (int i = 0; i < m; i++) {
+void init_thread_pool(int p) {
+    for (int i = 0; i < p; i++) {
         thread_pool.push(i);
     }
 }
@@ -256,7 +255,7 @@ void usage(char **argv) {
     printf("\nUsage: %s n k\n", argv[0]);
     printf("    n: Cantidad de usuarios\n");
     printf("    k: Cantidad de adversarios. k << n\n");
-    printf("    m: Cantidad de threads a utlizar.\n");
+    printf("    p: Cantidad de threads a utlizar.\n");
 }
 
 /* Función creada por Robert Jenkins. Genera un seed único para cada
