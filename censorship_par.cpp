@@ -142,7 +142,7 @@ int main(int argc, char *argv[]) {
         time2(stop);
         mpz_clear(usuarios);
         /* Output: claves encontradas y tiempo de ejecución */
-        printf("%d %.20fs\n", claves, time_diff(stop, start) / 1000000.0);
+        printf("%d %d %.20fs\n", k, claves, time_diff(stop, start) / 1000000.0);
     } else {
         usage(argv);
     }
