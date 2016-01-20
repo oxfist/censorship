@@ -23,7 +23,7 @@ std::queue<unsigned long> thread_pool;
 mpz_t usuarios;
 
 /* En un comienzo no hay adversarios identificados */
-int identificados, claves;
+unsigned int identificados, claves;
 
 void usage(char **argv);
 void *PrintHello(void *thread_id);
@@ -33,7 +33,7 @@ unsigned long mix(unsigned long a, unsigned long b, unsigned long c);
 
 int main(int argc, char *argv[]) {
     if (argc >= 4) {
-        int n, m, k, tam_grupo, resto, inicio, rc;
+        unsigned int n, m, k, tam_grupo, resto, inicio;
         unsigned long thread_activo;
         unsigned long seed = mix(clock(), time(NULL), getpid());
         time_586 start, stop;
@@ -69,19 +69,19 @@ int main(int argc, char *argv[]) {
         inicio = 0;
         if (resto > 0) {
             /* Creamos 'k-resto' grupos de tamaño tam_grupo */
-            for (int i = 0; i < k-resto; i++) {
+            for (unsigned int i = 0; i < k-resto; i++) {
                 grupos.push(std::make_pair(inicio, inicio + tam_grupo - 1));
                 inicio += tam_grupo;
             }
             /* Creamos 'resto' grupos de tamaño tam_grupo+1 */
-            for (int i = 0; i < resto; i++) {
+            for (unsigned int i = 0; i < resto; i++) {
                 grupos.push(std::make_pair(inicio, inicio + tam_grupo));
                 inicio += tam_grupo+1;
             }
         } else {
             /* Si la división es exacta, simplemente creamos 'k' grupos
              * de tamaño tam_grupo */
-            for (int i = 0; i < k; i++) {
+            for (unsigned int i = 0; i < k; i++) {
                 grupos.push(std::make_pair(inicio, inicio + tam_grupo - 1));
                 inicio += tam_grupo;
             }
